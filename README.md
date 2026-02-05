@@ -26,6 +26,23 @@ It includes:
 - `robot_port` (int, default `80`)
 - `poll_rate_hz` (double, default `10.0`)
 
+## Requirements
+
+- ROS 2 Humble on Ubuntu 22.04.
+- A camera publishing `sensor_msgs/msg/Image` on `/image_raw`.
+
+Example camera bringup (USB webcam):
+
+```bash
+ros2 run v4l2_camera v4l2_camera_node
+```
+
+If your camera publishes on a different topic, remap it when launching, for example:
+
+```bash
+ros2 run car_bridge vision_node --ros-args -r /image_raw:=/camera/image_raw
+```
+
 ## Build
 
 From a clean ROS 2 workspace:
@@ -34,7 +51,7 @@ From a clean ROS 2 workspace:
 colcon build --packages-select car_bridge
 ```
 
-## Run
+## Run Nodes
 
 ```bash
 source install/setup.bash
@@ -46,6 +63,12 @@ source install/setup.bash
 ros2 run car_bridge http_status_node
 ```
 
+## Run Launch
+
+```bash
+ros2 launch car_bridge car.launch.py 
+```
+
 ## Dependencies
 
 This package depends on ROS 2 and the following libraries:
@@ -54,3 +77,18 @@ This package depends on ROS 2 and the following libraries:
 - `libcurl`
 
 Use `rosdep` to install missing dependencies for your distro.
+
+## Vision Tuning Notes
+
+`vision_node` uses fixed HSV thresholds to detect red and simple area thresholds to decide motion:
+
+- Red mask thresholds (HSV):
+  - Low range: `H 0-10`, `S 120-255`, `V 80-255`
+  - High range: `H 170-179`, `S 120-255`, `V 80-255`
+- Area thresholds:
+  - Publish debug area on `/car/cont` when `area > 1000`
+  - Accept target when `area > 500`
+  - Move `F` when `area < 8000`
+  - Move `B` when `area >= 15000`
+
+If detection is unstable, adjust lighting or move the target closer/farther. To change the thresholds, update the constants in `src/vision_node.cpp`.
