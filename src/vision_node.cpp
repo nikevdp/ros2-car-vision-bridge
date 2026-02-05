@@ -13,7 +13,7 @@ public:
       std::bind(&VisionNode::cb, this, std::placeholders::_1)
     );
     cmd_pub_ = this->create_publisher<std_msgs::msg::String>("/car/cmd", 10);
-    cont_pub_ = this->create_publisher<std_msgs::msg::String>("/car/cont", 10); //debug topic
+    cont_pub_ = this->create_publisher<std_msgs::msg::String>("/car/cont", 10);
 
     RCLCPP_INFO(get_logger(), "Subscribed to /image_raw");
   }
@@ -21,7 +21,7 @@ public:
 private:
   cv::RNG rng{12345};
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr cmd_pub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr cont_pub_;//debug topic
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr cont_pub_;
   
   std::shared_ptr<std_msgs::msg::String> cmd = std::make_shared<std_msgs::msg::String>();
   std::shared_ptr<std_msgs::msg::String> pre_cmd = std::make_shared<std_msgs::msg::String>();
@@ -58,11 +58,12 @@ private:
       cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
       cv::Mat drawing = cv::Mat::zeros(mask.size(), CV_8UC3);
+
       /*for( size_t i = 0; i< contours.size(); i++ )
       { 
         cv::Scalar color = cv::Scalar( rng.uniform(0, 256), rng.uniform(0,256), rng.uniform(0,256) );
         cv::drawContours( drawing, contours, (int)i, color, 2, cv::LINE_8, hierarchy, 0 ); 
-      }*/ //habilitar si queremos ver los contornos con imshow
+      }*/ // Enable to visualize all contours with imshow.
 
       if (!contours.empty()) {
         auto max_it = std::max_element(
@@ -78,7 +79,7 @@ private:
         std_msgs::msg::String msg;
         msg.data = std::to_string(max_area);
         if(max_area > 1000) {
-          cont_pub_->publish(msg); //debug topic to see area size
+          cont_pub_->publish(msg);
         }
        
         if (max_area > 500) {
@@ -93,7 +94,7 @@ private:
             int error_y = 0;
             int cx = int(m.m10 / m.m00);
             int cy = int(m.m01 / m.m00);
-            cv::circle(debug_frame, cv::Point(cx, cy), 6, cv::Scalar(0,255,0), -1);
+            cv::circle(debug_frame, cv::Point(cx, cy), 6, cv::ScalN</mar(0,255,0), -1);
             error_x = cx - (debug_frame.cols/2);
             error_y = cy - (debug_frame.rows/2);
             RCLCPP_INFO_THROTTLE(get_logger(), *this->get_clock(), 500,
@@ -131,13 +132,13 @@ private:
             
           cv::imshow("tracked", debug_frame);
         } else {
-          cv::imshow("tracked", no_traking_frame); // se dejo de detectar
+          cv::imshow("tracked", no_traking_frame); // Target lost.
           if(pre_cmd->data != "S"){
             cmd->data = "S";
           }
         }
       } else {
-        cv::imshow("tracked", no_traking_frame); // nunca se detecto nada
+        cv::imshow("tracked", no_traking_frame); // No target detected yet.
         if(pre_cmd->data != "S"){
           cmd->data = "S";
         }

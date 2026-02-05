@@ -9,7 +9,7 @@
 
 using namespace std::chrono_literals;
 
-// curl callback: acumula bytes en un std::string
+// curl callback: accumulate bytes into a std::string.
 static size_t WriteToString(void* contents, size_t size, size_t nmemb, void* userp) {
   size_t total = size * nmemb;
   auto* s = static_cast<std::string*>(userp);
@@ -17,7 +17,7 @@ static size_t WriteToString(void* contents, size_t size, size_t nmemb, void* use
   return total;
 }
 
-// Valida si el char es uno de los esperados
+// Validate command char.
 bool is_valid(char c) {
   switch (c) {
     case 'F':
@@ -31,7 +31,7 @@ bool is_valid(char c) {
   }
 }
 
-//Helper para splitear strings
+// Helper to split strings.
 static std::vector<std::string> split(const std::string& s, char delimiter) {
     std::vector<std::string> tokens;
     std::string token;
@@ -42,7 +42,7 @@ static std::vector<std::string> split(const std::string& s, char delimiter) {
     return tokens;
 }
 
-// GET simple. Devuelve true si salió bien y llena out_body.
+// Simple GET. Returns true on success and fills out_body.
 static bool HttpGet(const std::string& url, std::string& out_body, long& http_code, std::string& out_err) {
   out_body.clear();
   out_err.clear();
@@ -58,7 +58,7 @@ static bool HttpGet(const std::string& url, std::string& out_body, long& http_co
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteToString);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &out_body);
 
-  // Para LAN suele bastar. Timeout corto para no colgar el timer:
+  // For LAN this is usually enough. Short timeout to avoid hanging the timer.
   curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 500L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 500L);
 
@@ -128,13 +128,13 @@ private:
         delayed_timer_->cancel();
       }
       if (cmd == 'S') {
-        return; // No delay for stop command
+        return; // No delay for stop command.
       }
         delayed_timer_ = this->create_wall_timer(
         std::chrono::seconds(20),
         [this]() {
           RCLCPP_INFO(get_logger(), "20s elapsed since last cmd");
-          sendCmd('S');  // Send stop command after delay
+          sendCmd('S');  // Send stop command after delay.
           delayed_timer_->cancel();
         }
         );
@@ -146,11 +146,11 @@ private:
   }
 
   void onTimer() {
-    // 1) Armar URL
+    // Build URL.
     const std::string url =
       "http://" + robot_ip_ + ":" + std::to_string(robot_port_) + "/status";
 
-    // 2) Hacer GET
+    // Perform GET.
     std::string body;
     std::string err;
     long code = 0;
@@ -174,7 +174,7 @@ private:
       consecutive_failures = 0;
     }
     
-    // 3) Parsear body (formato: "C AAAAA" donde C es char cmd y AAAAA es int age_ms)
+    // Parse body (format: "C AAAAA" where C is cmd and AAAAA is age_ms).
     std::vector<std::string> tokens = split(body, ' ');
     if (tokens.size() < 2) {
       health_msg.data = "BAD_FORMAT";
@@ -187,12 +187,12 @@ private:
     }
     char cmd = tokens[0][0];
     int age_ms = std::stoi(tokens[1]);
-    // Publicar mensaje
+    // Publish parsed status.
     std_msgs::msg::String msg;
     msg.data = std::string(1, cmd) + " " + std::to_string(age_ms);
     status_pub_->publish(msg);
 
-    // 4) Por ahora, logueamos crudo:
+    // Log raw status for visibility.
     RCLCPP_INFO_THROTTLE(get_logger(), *this->get_clock(), 1000,
                          "Status: '%s' (http=%ld)", body.c_str(), code);
     RCLCPP_INFO_THROTTLE(get_logger(), *this->get_clock(), 1000,
