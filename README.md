@@ -69,6 +69,42 @@ ros2 run car_bridge http_status_node
 ros2 launch car_bridge car.launch.py 
 ```
 
+## ESP32 Firmware (car-esp32)
+
+This repo includes an ESP32 firmware that exposes a simple HTTP API to drive the car and report status.
+
+Location: `car-esp32/car_direction_http.ino`
+
+### Setup (Arduino IDE)
+
+1. Open `car-esp32/car_direction_http.ino`.
+2. Set your WiFi credentials:
+   - `ssid`
+   - `pass`
+3. Select your ESP32 board and upload.
+
+### HTTP Endpoints
+
+- `GET /cmd?m=F|B|L|R|S` — move commands.
+- `GET /status` — returns `"C age_ms"` where `C` is the last command and `age_ms` is its age in ms.
+
+### Wiring (Motor Driver Pins)
+
+The firmware expects these GPIO connections:
+
+- `IN1=25`, `IN2=26`, `IN3=27`, `IN4=14`
+- `ENA=32`, `ENB=33` (PWM speed control)
+
+If your wiring differs, update the pin constants in the `.ino`.
+
+### ROS 2 Bridge Config
+
+Use the ESP32 IP in `http_status_node`:
+
+```bash
+ros2 run car_bridge http_status_node --ros-args -p robot_ip:=<ESP32_IP>
+```
+
 ## Dependencies
 
 This package depends on ROS 2 and the following libraries:
