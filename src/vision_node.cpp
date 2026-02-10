@@ -12,9 +12,17 @@ public:
       "/image_raw", 10,
       std::bind(&VisionNode::cb, this, std::placeholders::_1)
     );
-    cmd_pub_ = this->create_publisher<std_msgs::msg::String>("/car/cmd", 10);
-    cont_pub_ = this->create_publisher<std_msgs::msg::String>("/car/cont", 10);
-
+    h1_low_ = this->declare_parameter<int>("h1_low", 0);
+    h1_high_ = this->declare_parameter<int>("h1_high", 10);
+    h2_low_ = this->declare_parameter<int>("h2_low", 170);
+    h2_high_ = this->declare_parameter<int>("h2_high", 179);
+    s_min_ = this->declare_parameter<int>("s_min", 120);
+    s_max_ = this->declare_parameter<int>("s_max", 255);
+    v_min_ = this->declare_parameter<int>("v_min", 80);
+    v_max_ = this->declare_parameter<int>("v_max", 255);
+    min_area_ = this->declare_parameter<int>("min_area", 8000);
+    max_area_ = this->declare_parameter<int>("max_area", 15000);
+    deadband_x_ = this->declare_parameter<int>("deadband_x", 50);
     RCLCPP_INFO(get_logger(), "Subscribed to /image_raw");
   }
 
@@ -25,10 +33,14 @@ private:
   
   std::shared_ptr<std_msgs::msg::String> cmd = std::make_shared<std_msgs::msg::String>();
   std::shared_ptr<std_msgs::msg::String> pre_cmd = std::make_shared<std_msgs::msg::String>();
+  int h1_low_, h1_high_, h2_low_, h2_high_;
+  int s_min_, s_max_, v_min_, v_max_;
+  int min_area_, max_area_, deadband_x_;
   void cb(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
     try {
       auto cv_ptr = cv_bridge::toCvShare(msg, "bgr8");
       const cv::Mat& frame = cv_ptr->image;
+  
       cv::Mat no_traking_frame = frame.clone();
       cv::Mat hsv_frame;
       cv::cvtColor(frame, hsv_frame, cv::COLOR_BGR2HSV);
@@ -36,13 +48,13 @@ private:
       cv::Mat mask1, mask2, mask;
 
       cv::inRange(hsv_frame,
-            cv::Scalar(0,   120, 80),
-            cv::Scalar(10,  255, 255),
+            cv::Scalar(h1_low_,   s_min_, v_min_),
+            cv::Scalar(h1_high_, s_max_, v_max_),
             mask1);
 
       cv::inRange(hsv_frame,
-            cv::Scalar(170, 120, 80),
-            cv::Scalar(179, 255, 255),
+            cv::Scalar(h2_low_,  s_min_, v_min_),
+            cv::Scalar(h2_high_, s_max_, v_max_),
             mask2);
 
       mask = mask1 | mask2;
@@ -75,14 +87,14 @@ private:
         }
         );
   
-        double max_area = cv::contourArea(*max_it);
+        double max_contour = cv::contourArea(*max_it);
         std_msgs::msg::String msg;
-        msg.data = std::to_string(max_area);
-        if(max_area > 1000) {
+        msg.data = std::to_string(max_contour);
+        if(max_contour > 1000) {
           cont_pub_->publish(msg);
         }
        
-        if (max_area > 500) {
+        if (max_contour > 500) {
           
           cv::Mat debug_frame = frame.clone();
           cv::drawContours(debug_frame, std::vector<std::vector<cv::Point>>{*max_it},
@@ -94,7 +106,7 @@ private:
             int error_y = 0;
             int cx = int(m.m10 / m.m00);
             int cy = int(m.m01 / m.m00);
-            cv::circle(debug_frame, cv::Point(cx, cy), 6, cv::ScalN</mar(0,255,0), -1);
+            cv::circle(debug_frame, cv::Point(cx, cy), 6, cv::Scalar(0,255,0), -1);
             error_x = cx - (debug_frame.cols/2);
             error_y = cy - (debug_frame.rows/2);
             RCLCPP_INFO_THROTTLE(get_logger(), *this->get_clock(), 500,
@@ -102,22 +114,22 @@ private:
             if(cmd->data == ""){
               cmd->data = "S";
             }
-            else if(error_x >= -50 && error_x <= 50){
-              if(max_area < 8000){
+            else if(std::abs(error_x) <= deadband_x_){
+              if(max_contour < min_area_){
                 cmd->data = "F";
               }
-              else if(max_area >= 15000){
+              else if(max_contour >= max_area_){
                 cmd->data = "B";
               }
               else{
                 cmd->data = "S";
               }
             }
-            else if(error_x > 50){
-              cmd->data = "L";
-            }
-             else if(error_x < -50){
+            else if(error_x > deadband_x_){
               cmd->data = "R";
+            }
+             else if(error_x < -deadband_x_){
+              cmd->data = "L";
             }
             else{
               cmd->data = "S";
